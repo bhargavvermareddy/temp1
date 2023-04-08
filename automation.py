@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+from git import Repo
 
 path = 'clonedrepos'
 jenkins_directory = 'jenkins'
@@ -20,6 +21,52 @@ spring_entrypoint = 'dockfile/spring/entrypoint.sh'
 spring_helm = 'helmchart/spring-helm'
 
 configs_dir = 'configs'
+
+
+def get_release_branches():
+    repo = Repo(repo_dir)
+    remote = repo.remote(name='origin')
+    remote.fetch()
+    branches = [x for x in remote.refs if 'release/v' in x.name]
+    return branches
+
+
+def get_latest_commit(branch):
+    repo = Repo(repo_dir)
+    commit = repo.commit(branch)
+    return commit.committed_date
+
+
+def sort_branches():
+    branches = get_release_branches()
+    sorted_branches = sorted(branches, key=get_latest_commit, reverse=True)
+    return sorted_branches
+
+
+# get the latest release branch name
+latest_rel_branch = sort_branches()[0].name.replace('origin/', '')
+# latest_rel_branch = rel_branch.replace()
+
+# clone the repos
+with open('repolist.txt', 'r') as f:
+    data = f.read()
+    for each_repo in data:
+        # repo_url = 'https://github.com/bhargavvermareddy/temp1.git'
+        repo_dir = f'gitclones/{each_repo}'
+        Repo.clone_from(each_repo, repo_dir)
+        repo = Repo(f'gitclones/{each_repo}')
+        print(
+            f'Current Active Branch in {each_repo} is: {repo.active_branch.name}')
+        remote = repo.remote(name='origin')
+        remote.fetch()
+        # check out the latest release branch
+        repo.git.checkout(latest_rel_branch)
+        new_feature_branch = repo.create_head('feature/adding-helm-charts')
+        new_feature_branch.checkout()
+        print(
+            f'Current Active Branch post checkout in {each_repo} is: {repo.active_branch.name}')
+
+# print(repo.active_branch.name)
 
 directories = [d for d in os.listdir(
     path) if os.path.isdir(os.path.join(path, d))]
